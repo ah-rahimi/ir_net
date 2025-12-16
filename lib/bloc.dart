@@ -24,7 +24,7 @@ import 'utils/kerio.dart';
 class AppBloc with AppSystemTray {
   static const platform = MethodChannel('ir_net/system_events');
 
-  final _latLng = StreamController<LatLng>();
+  final _latLng = StreamController<LatLng>.broadcast();
   final _ipLookupResult = BehaviorSubject();
   final _clearLeakInput = LiveEvent();
   final _leakChecklist = BehaviorSubject<List<LeakItem>>();
@@ -41,15 +41,15 @@ class AppBloc with AppSystemTray {
   String? _leakInput;
 
   Stream<LatLng> get latLng => _latLng.stream;
-  Stream get ipLookupResult => _ipLookupResult.stream;
+  Stream get ipLookupResult => _ipLookupResult.stream.asBroadcastStream();
   Stream get clearLeakInput => _clearLeakInput.stream;
-  Stream<List<LeakItem>> get leakChecklist => _leakChecklist.stream;
-  Stream<LocalNetworksResult> get localNetwork => _localNetwork.stream;
-  Stream<double?> get ping => _ping.stream;
-  Stream<double?> get downloadSpeed => _downloadSpeed.stream;
-  Stream<double?> get uploadSpeed => _uploadSpeed.stream;
-  Stream<String> get speedTestStatus => _speedTestStatus.stream;
-  Stream<KerioBalance> get kerioBalance => _kerioBalance.stream;
+  Stream<List<LeakItem>> get leakChecklist => _leakChecklist.stream.asBroadcastStream();
+  Stream<LocalNetworksResult> get localNetwork => _localNetwork.stream.asBroadcastStream();
+  Stream<double?> get ping => _ping.stream.asBroadcastStream();
+  Stream<double?> get downloadSpeed => _downloadSpeed.stream.asBroadcastStream();
+  Stream<double?> get uploadSpeed => _uploadSpeed.stream.asBroadcastStream();
+  Stream<String> get speedTestStatus => _speedTestStatus.stream.asBroadcastStream();
+  Stream<KerioBalance> get kerioBalance => _kerioBalance.stream.asBroadcastStream();
 
   final speedtest = FlutterSpeedtest(
     baseUrl: 'http://speedtest.jaosing.com:8080',

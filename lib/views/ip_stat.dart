@@ -5,6 +5,7 @@ import 'package:country_flags/country_flags.dart';
 import 'package:flutter/material.dart';
 import 'package:ir_net/main.dart';
 import 'package:ir_net/utils/cmd.dart';
+import 'package:ir_net/widgets/modern_widgets.dart';
 
 class IpStatView extends StatefulWidget {
   const IpStatView({super.key});
@@ -13,18 +14,41 @@ class IpStatView extends StatefulWidget {
   State<IpStatView> createState() => _IpStatViewState();
 }
 
-class _IpStatViewState extends State<IpStatView> {
+class _IpStatViewState extends State<IpStatView> with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _animationController.forward();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        lookupResult(),
-        const SizedBox(height: 16),
-        networkInfo(),
-      ],
+    return ModernCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SectionHeader(
+            title: 'Network Information',
+            icon: Icons.public,
+          ),
+          const SizedBox(height: 16),
+          lookupResult(),
+          const SizedBox(height: 16),
+          networkInfo(),
+        ],
+      ),
     );
   }
 
@@ -36,34 +60,40 @@ class _IpStatViewState extends State<IpStatView> {
         if (data == null) {
           return const SizedBox.shrink();
         }
-        return SizedBox(
-          width: 400,
-          child: Column(
-            children: [
-              ipAddress(),
-              coloredText('DNS records:          ${data.dns[0]}, ${data.dns[1]}'),
-              coloredText('Local IP Address:    ${_localIpText(data.interfaces)}')
-            ],
-          ),
+        return Column(
+          children: [
+            ipAddress(),
+            const SizedBox(height: 12),
+            _buildInfoCard(
+              icon: Icons.dns,
+              label: 'DNS Servers',
+              value: '${data.dns[0]}\n${data.dns[1]}',
+              color: const Color(0xFF0EA5E9),
+            ),
+            const SizedBox(height: 12),
+            ..._buildLocalIpCards(data.interfaces),
+          ],
         );
       },
     );
   }
 
-  String _localIpText(List<NetworkInterface> interfaces) {
-    var result = '';
-    for (var i = 0; i < interfaces.length; i++) {
-      final inf = interfaces[i];
-      if (interfaces.length > 1 && i > 0 && i < interfaces.length) {
-        result += '\n                               ';
-      }
+  List<Widget> _buildLocalIpCards(List<NetworkInterface> interfaces) {
+    return interfaces.map((inf) {
       var interfaceName = inf.interfaceName;
-      if (interfaceName.length > 10) {
-        interfaceName = "${interfaceName.substring(0, 5)}...${interfaceName.substring(interfaceName.length - 5)}";
+      if (interfaceName.length > 20) {
+        interfaceName = "${interfaceName.substring(0, 10)}...${interfaceName.substring(interfaceName.length - 7)}";
       }
-      result += '${inf.ipv4} ($interfaceName)';
-    }
-    return result;
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: _buildInfoCard(
+          icon: Icons.network_check,
+          label: 'Local IP ($interfaceName)',
+          value: inf.ipv4,
+          color: const Color(0xFF10B981),
+        ),
+      );
+    }).toList();
   }
 
   Widget ipAddress() {
@@ -72,19 +102,76 @@ class _IpStatViewState extends State<IpStatView> {
       builder: (context, snapshot) {
         final data = snapshot.data;
         if (data == null) {
-          return const SizedBox.shrink();
+          return const ShimmerLoading(
+            width: double.infinity,
+            height: 60,
+            borderRadius: BorderRadius.all(Radius.circular(12)),
+          );
         }
-        return coloredText('Public IP address:   ${data['query']}');
+        return _buildInfoCard(
+          icon: Icons.public,
+          label: 'Public IP Address',
+          value: data['query'],
+          color: const Color(0xFF3B82F6),
+        );
       },
     );
   }
 
-  Widget coloredText(String value) {
+  Widget _buildInfoCard({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+  }) {
     return Container(
-      color: Colors.black12,
       width: double.infinity,
-      padding: const EdgeInsets.all(8),
-      child: Text(value),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: color.withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: Colors.white, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).textTheme.bodyMedium?.color,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: color,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -94,7 +181,19 @@ class _IpStatViewState extends State<IpStatView> {
       builder: (context, snapshot) {
         final data = snapshot.data;
         if (data == null) {
-          return const SizedBox.shrink();
+          return Column(
+            children: List.generate(
+              4,
+              (index) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: ShimmerLoading(
+                  width: double.infinity,
+                  height: 50,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          );
         }
 
         final map = data as LinkedHashMap;
@@ -102,63 +201,97 @@ class _IpStatViewState extends State<IpStatView> {
         final entries = map.entries
             .where((e) => e.key != 'lat' && e.key != 'lon' && e.key != 'query' && e.key != 'countryCode')
             .toList();
+        
         if (entries.isEmpty) {
           return const SizedBox.shrink();
         }
 
-        final longestLength =
-        entries.map((e) => e.key.toString().length).fold(0, max);
-        final keyColumnWidth = (longestLength * 8.0).clamp(120.0, 280.0);
-
-        return Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(24),
-          child: ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: entries.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 6),
-            itemBuilder: (context, index) {
-              final e = entries[index];
-              return Container(
-                color: Colors.black12,
-                padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      width: keyColumnWidth,
-                      child: Text(
-                        e.key.toString(),
-                        style: const TextStyle(fontFamily: 'monospace'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
+        return Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? const Color(0xFF1E293B)
+                    : const Color(0xFFFFFFFF),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? const Color(0xFF334155)
+                      : const Color(0xFFE2E8F0),
+                  width: 1,
+                ),
+              ),
+              child: Column(
+                children: entries.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final e = entry.value;
+                  
+                  return TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0.0, end: 1.0),
+                    duration: Duration(milliseconds: 400 + (index * 100)),
+                    curve: Curves.easeOutCubic,
+                    builder: (context, value, child) {
+                      return Transform.translate(
+                        offset: Offset(20 * (1 - value), 0),
+                        child: Opacity(
+                          opacity: value,
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
                       child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            '${e.value}',
-                            softWrap: true,
-                          ),
-                          if (e.key == 'country')
-                            const SizedBox(width: 16),
-                          if (e.key == 'country')
-                            CountryFlag.fromCountryCode(
-                              countryCode,
-                              theme: const ImageTheme(
-                                height: 20,
-                                width: 30,
+                          SizedBox(
+                            width: 100,
+                            child: Text(
+                              e.key.toString(),
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: Theme.of(context).textTheme.bodyMedium?.color,
+                                fontSize: 13,
                               ),
                             ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    '${e.value}',
+                                    style: TextStyle(
+                                      color: Theme.of(context).primaryColor,
+                                      fontWeight: FontWeight.w500,
+                                      fontSize: 14,
+                                    ),
+                                    softWrap: true,
+                                  ),
+                                ),
+                                if (e.key == 'country') ...[
+                                  const SizedBox(width: 12),
+                                  CountryFlag.fromCountryCode(
+                                    countryCode,
+                                    theme: const ImageTheme(
+                                      height: 20,
+                                      width: 30,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                  ],
-                ),
-              );
-            },
-          ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
         );
       },
     );

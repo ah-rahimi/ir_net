@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:ir_net/widgets/modern_widgets.dart';
 import 'package:launch_at_startup/launch_at_startup.dart';
 
 import '../data/shared_preferences.dart';
@@ -15,27 +16,35 @@ class AppOptions extends StatefulWidget {
 class _AppOptionsState extends State<AppOptions> {
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 400,
+    return ModernCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [showLeakInSysTray(), launchAtStartup()],
+        children: [
+          const SectionHeader(
+            title: 'Settings',
+            icon: Icons.settings,
+          ),
+          const SizedBox(height: 12),
+          showLeakInSysTray(),
+          const Divider(height: 24),
+          launchAtStartup(),
+        ],
       ),
     );
   }
 
   Widget launchAtStartup() {
     if (Platform.isWindows == false) {
-      // todo: implement other platforms
-      return SizedBox();
+      return const SizedBox.shrink();
     }
     return FutureBuilder<bool>(
       future: LaunchAtStartup.instance.isEnabled(),
       builder: (context, snapshot) {
         final value = snapshot.data ?? false;
-        return CheckboxListTile(
-          title: const Text('Launch on windows startup?'),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+        return _buildSettingTile(
+          icon: Icons.power_settings_new,
+          title: 'Launch on Startup',
+          subtitle: 'Start IRNet automatically with Windows',
           value: value,
           onChanged: (enabled) {
             if (enabled == true) {
@@ -55,9 +64,10 @@ class _AppOptionsState extends State<AppOptions> {
       future: AppSharedPreferences.showLeakInSysTray,
       builder: (context, snapshot) {
         final value = snapshot.data ?? false;
-        return CheckboxListTile(
-          title: const Text('Show leak detection on system tray icon?'),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+        return _buildSettingTile(
+          icon: Icons.notifications_active,
+          title: 'System Tray Notifications',
+          subtitle: 'Show leak detection status in system tray',
           value: value,
           onChanged: (enabled) async {
             await AppSharedPreferences.setShowLeakInSysTray(enabled ?? false);
@@ -65,6 +75,59 @@ class _AppOptionsState extends State<AppOptions> {
           },
         );
       },
+    );
+  }
+
+  Widget _buildSettingTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required bool value,
+    required ValueChanged<bool?> onChanged,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Theme.of(context).primaryColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              icon,
+              color: Theme.of(context).primaryColor,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: value,
+            onChanged: onChanged,
+            activeColor: Theme.of(context).primaryColor,
+          ),
+        ],
+      ),
     );
   }
 }

@@ -1,7 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:ir_net/data/leak_item.dart';
 import 'package:ir_net/main.dart';
-import 'package:ir_net/views/kerio_login.dart';
+import 'package:ir_net/widgets/modern_widgets.dart';
 import 'package:touch_mouse_behavior/touch_mouse_behavior.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -12,38 +14,58 @@ class LeakView extends StatefulWidget {
   State<LeakView> createState() => _LeakViewState();
 }
 
-class _LeakViewState extends State<LeakView> {
+class _LeakViewState extends State<LeakView> with SingleTickerProviderStateMixin {
   late TextEditingController textInputController;
+  late AnimationController _animationController;
+  StreamSubscription? _clearLeakInputSubscription;
 
   @override
   void initState() {
-    textInputController = TextEditingController();
-    bloc.clearLeakInput.listen((_) {
-      textInputController.clear();
-    });
     super.initState();
+    textInputController = TextEditingController();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    
+    // Listen to clear leak input stream
+    _setupClearInputListener();
+  }
+  
+  void _setupClearInputListener() {
+    _clearLeakInputSubscription?.cancel();
+    _clearLeakInputSubscription = bloc.clearLeakInput.listen((_) {
+      if (mounted) {
+        textInputController.clear();
+      }
+    });
   }
 
   @override
   void dispose() {
+    _clearLeakInputSubscription?.cancel();
     textInputController.dispose();
+    _animationController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        const Text('Leak detection'),
-        const SizedBox(height: 16),
-        SizedBox(
-          width: 400,
-          child: input(),
-        ),
-        const SizedBox(height: 16),
-        items(),
-        const KerioLoginView()
-      ],
+    return ModernCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SectionHeader(
+            title: 'Leak Detection',
+            icon: Icons.shield_outlined,
+            subtitle: 'Test your VPN for DNS leaks',
+          ),
+          const SizedBox(height: 16),
+          input(),
+          const SizedBox(height: 16),
+          items(),
+        ],
+      ),
     );
   }
 
@@ -52,17 +74,32 @@ class _LeakViewState extends State<LeakView> {
       stream: bloc.leakChecklist,
       builder: (context, snapshot) {
         final data = snapshot.data;
-        if (data == null) {
-          return const SizedBox.shrink();
+        if (data == null || data.isEmpty) {
+          return Container(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              children: [
+                Icon(
+                  Icons.inbox_outlined,
+                  size: 64,
+                  color: Theme.of(context).textTheme.bodyMedium?.color,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'No leak tests yet',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ],
+            ),
+          );
         }
         return SizedBox(
-          width: 400,
-          height: 250,
+          height: 300,
           child: TouchMouseScrollable(
             child: ListView.builder(
               itemCount: data.length,
               itemBuilder: (context, index) {
-                return item(data[index]);
+                return _buildLeakItem(data[index], index);
               },
             ),
           ),
@@ -71,48 +108,105 @@ class _LeakViewState extends State<LeakView> {
     );
   }
 
-  Widget item(LeakItem item) {
-    return InkWell(
-      onTap: () {
-        launchUrl(Uri.parse(item.url));
+  Widget _buildLeakItem(LeakItem item, int index) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: Duration(milliseconds: 300 + (index * 50)),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) {
+        return Transform.translate(
+          offset: Offset(0, 20 * (1 - value)),
+          child: Opacity(
+            opacity: value,
+            child: child,
+          ),
+        );
       },
-      child: Container(
-        width: 400,
-        decoration: const BoxDecoration(
-          shape: BoxShape.rectangle,
-          color: Colors.black12,
-          borderRadius: BorderRadius.all(Radius.circular(4)),
-        ),
-        padding: const EdgeInsets.all(8),
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(
-          children: [
-            if (item.status == LeakStatus.failed)
-              const Icon(Icons.remove_circle_outline, color: Colors.red),
-            if (item.status == LeakStatus.passed) const Icon(Icons.check, color: Colors.green),
-            if (item.status == LeakStatus.loading)
-              const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(),
-              ),
-            const SizedBox(width: 8),
-            Expanded(
+      child: InkWell(
+        onTap: () => launchUrl(Uri.parse(item.url)),
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? const Color(0xFF1E293B)
+                : const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? const Color(0xFF334155)
+                  : const Color(0xFFE2E8F0),
+              width: 1,
+            ),
+          ),
+          padding: const EdgeInsets.all(12),
+          margin: const EdgeInsets.symmetric(vertical: 6),
+          child: Row(
+            children: [
+              _buildStatusIcon(item.status ?? LeakStatus.loading),
+              const SizedBox(width: 12),
+              Expanded(
                 child: Text(
-              item.url,
-              style: const TextStyle(color: Colors.blueAccent),
-            )),
-            IconButton(
-              onPressed: () => bloc.onDeleteLeakItemClick(item),
-              icon: Icon(
-                Icons.highlight_remove_outlined,
-                color: Colors.red.withAlpha(80),
+                  item.url,
+                  style: TextStyle(
+                    color: Theme.of(context).primaryColor,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-            )
-          ],
+              IconButton(
+                onPressed: () => bloc.onDeleteLeakItemClick(item),
+                icon: const Icon(Icons.close, size: 18),
+                color: const Color(0xFF64748B),
+              )
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  Widget _buildStatusIcon(LeakStatus status) {
+    switch (status) {
+      case LeakStatus.failed:
+        return Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: const Color(0xFFEF4444).withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Icon(
+            Icons.close,
+            color: Color(0xFFEF4444),
+            size: 18,
+          ),
+        );
+      case LeakStatus.passed:
+        return Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: const Color(0xFF10B981).withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Icon(
+            Icons.check,
+            color: Color(0xFF10B981),
+            size: 18,
+          ),
+        );
+      case LeakStatus.loading:
+        return const SizedBox(
+          width: 32,
+          height: 32,
+          child: Center(
+            child: SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ),
+        );
+    }
   }
 
   Widget input() {
@@ -121,15 +215,13 @@ class _LeakViewState extends State<LeakView> {
       onChanged: bloc.onLeakInputChanged,
       onSubmitted: (_) => bloc.onAddLeakItemClick(),
       decoration: InputDecoration(
-        focusedBorder: const OutlineInputBorder(
-          borderSide: BorderSide(color: Colors.green),
-        ),
-        enabledBorder: const OutlineInputBorder(
-          borderSide: BorderSide(color: Colors.blue),
-        ),
         hintText: 'https://developer.google.com',
-        hintStyle: const TextStyle(color: Colors.black38),
-        suffixIcon: IconButton(onPressed: bloc.onAddLeakItemClick, icon: const Icon(Icons.add)),
+        prefixIcon: const Icon(Icons.link),
+        suffixIcon: IconButton(
+          onPressed: bloc.onAddLeakItemClick,
+          icon: const Icon(Icons.add_circle),
+          tooltip: 'Add URL',
+        ),
       ),
     );
   }

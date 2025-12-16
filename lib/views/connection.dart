@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ir_net/widgets/modern_widgets.dart';
 
 import '../main.dart';
 
@@ -9,24 +10,37 @@ class Connection extends StatefulWidget {
   State<Connection> createState() => _ConnectionState();
 }
 
-class _ConnectionState extends State<Connection> {
+class _ConnectionState extends State<Connection> with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 400,
-      height: 100,
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.blueAccent),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.center,
+    return ModernCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          SectionHeader(
+            title: 'Speed Test',
+            icon: Icons.speed,
+            trailing: testButton(),
+          ),
+          const SizedBox(height: 20),
           results(),
-          const SizedBox(width: 24),
-          testButton(),
         ],
       ),
     );
@@ -34,11 +48,11 @@ class _ConnectionState extends State<Connection> {
 
   Widget results() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         pingRow(),
+        const SizedBox(height: 12),
         downloadRow(),
+        const SizedBox(height: 12),
         uploadRow(),
       ],
     );
@@ -49,17 +63,11 @@ class _ConnectionState extends State<Connection> {
       stream: bloc.ping,
       builder: (context, snapshot) {
         final value = snapshot.data ?? 0.0;
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            const Icon(Icons.timer, color: Colors.teal, size: 18),
-            const SizedBox(width: 4),
-            Text(
-              'Ping: ${value.toInt()} ms',
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 16, color: Colors.teal, fontWeight: FontWeight.bold),
-            )
-          ],
+        return InfoRow(
+          icon: Icons.timer,
+          label: 'Ping',
+          value: '${value.toInt()} ms',
+          iconColor: const Color(0xFF06B6D4),
         );
       },
     );
@@ -70,19 +78,12 @@ class _ConnectionState extends State<Connection> {
       stream: bloc.downloadSpeed,
       builder: (context, snapshot) {
         final value = (snapshot.data ?? 0.0).toInt();
-        final formattedValue = value == 0 ? '--' : '${value.toInt()} Mb/s';
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            const Icon(Icons.download, color: Colors.deepOrange, size: 18),
-            const SizedBox(width: 4),
-            Text(
-              'Download speed: $formattedValue',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                  fontSize: 16, color: Colors.deepOrange, fontWeight: FontWeight.bold),
-            ),
-          ],
+        final formattedValue = value == 0 ? '--' : '$value Mb/s';
+        return InfoRow(
+          icon: Icons.download,
+          label: 'Download Speed',
+          value: formattedValue,
+          iconColor: const Color(0xFF3B82F6),
         );
       },
     );
@@ -96,51 +97,31 @@ class _ConnectionState extends State<Connection> {
         if (value > 500) {
           value = 0;
         }
-        final formattedValue = value == 0 ? '--' : '${value.toInt()} Mb/s';
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            const Icon(Icons.upload, color: Colors.deepPurple, size: 18),
-            const SizedBox(width: 4),
-            Text(
-              'Upload speed: $formattedValue',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                  fontSize: 16, color: Colors.deepPurple, fontWeight: FontWeight.bold),
-            ),
-          ],
+        final formattedValue = value == 0 ? '--' : '$value Mb/s';
+        return InfoRow(
+          icon: Icons.upload,
+          label: 'Upload Speed',
+          value: formattedValue,
+          iconColor: const Color(0xFF8B5CF6),
         );
       },
     );
   }
 
   Widget testButton() {
-    return StreamBuilder(stream: bloc.speedTestStatus, builder: (context, snapshot) {
-      final value = snapshot.data ?? 'Not started';
+    return StreamBuilder(
+      stream: bloc.speedTestStatus,
+      builder: (context, snapshot) {
+        final value = snapshot.data ?? 'Not started';
+        final isRunning = value == 'Running';
 
-      return Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          ElevatedButton(
-            onPressed: () {
-              if (value != 'Running') {
-                bloc.onConnectionTestClick();
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
-              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 24),
-              backgroundColor: value == 'Running' ? Colors.grey : Colors.blue,
-            ),
-            child: const Text('Test', style: TextStyle(color: Colors.white, fontSize: 18)),
-          ),
-          const SizedBox(height: 4),
-          if (value == 'Running')
-            const SizedBox(width: 20, height: 20, child: CircularProgressIndicator())
-          else
-            Text(value)
-        ],
-      );
-    });
+        return GradientButton(
+          text: 'Test',
+          icon: isRunning ? null : Icons.play_arrow,
+          isLoading: isRunning,
+          onPressed: isRunning ? null : bloc.onConnectionTestClick,
+        );
+      },
+    );
   }
 }
